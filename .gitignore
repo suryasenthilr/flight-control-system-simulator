@@ -13,3 +13,6 @@ ENV/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local personal study files
+VIVA_QUESTIONS.md

@@ -230,7 +230,6 @@ flight-control-system-simulator/
 │   ├── root_locus.png          # Generated publication figure
 │   └── anti_windup_comparison.png
 ├── DOCUMENTATION.md            # Formal project report (derivations, math, tables)
-├── VIVA_QUESTIONS.md           # 35 oral exam / viva questions with textbook answers
 ├── run_simulation.bat          # 1-Click Windows launcher
 ├── run_simulation.py           # Python local server launcher
 └── README.md                   # Comprehensive technical documentation
