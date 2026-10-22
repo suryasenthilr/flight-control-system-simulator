@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroSim-Control: Aircraft Autopilot & Control Systems Digital Lab</title>
+    
+    <!-- Offline and CDN Stylesheets -->
+    <link rel="stylesheet" href="lib/katex.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" onerror="this.onerror=null;">
+    <link rel="stylesheet" href="app.css">
+    
+    <!-- Google Fonts for crisp avionics HUD typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Header Navigation Bar -->
+    <header class="app-header">
+        <div class="brand-section">
+            <div class="brand-icon">✈</div>
+            <div>
+                <div class="brand-title">
+                    AEROSIM-CONTROL
+                </div>
+                <div class="brand-sub">Aircraft Longitudinal Autopilot & Control Engineering Simulation Lab</div>
+            </div>
+        </div>
+
+        <!-- Real-Time Flight Telemetry Readouts -->
+        <div class="telemetry-bar">
+            <div class="telemetry-item">
+                <span class="telemetry-label">Mission Time</span>
+                <span class="telemetry-val" id="telemetrySimTime">T+ 0.0s</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Altitude (h)</span>
+                <span class="telemetry-val" id="telemetryAlt">10000 m</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">True Airspeed</span>
+                <span class="telemetry-val" id="telemetrySpeed">236.0 m/s</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Pitch Rate (q)</span>
+                <span class="telemetry-val" id="telemetryPitchRate">0.00 °/s</span>
+            </div>
+        </div>
+
+        <!-- Master Simulation Actions -->
+        <div class="header-actions">
+            <button class="btn btn-primary" id="btnHelpTour" title="Click here to understand what this project is!">
+                <i class="icon">💡</i> What Is This? (Start Here)
+            </button>
+            <button class="btn" id="btnPlayPause">
+                <i class="icon">⏸</i> Pause
+            </button>
+            <button class="btn" id="btnReset">
+                <i class="icon">🔄</i> Reset Sim
+            </button>
+            <button class="btn" id="btnExportCsv" title="Export all simulation time series data to CSV">
+                <i class="icon">📥</i> Export CSV
+            </button>
+            <button class="btn" id="btnSnapshot" title="Print or save PDF report snapshot">
+                <i class="icon">🖨</i> Print Report
+            </button>
+        </div>
+    </header>
+
+    <!-- Quick Scenario Preset Bar -->
+    <div class="scenarios-bar">
+        <span class="scenarios-label">⚡ One-Click Missions:</span>
+        <div class="scenarios-list">
+            <button class="btn-scenario" data-scenario="step_climb">
+                🛫 1. Pitch Step Climb (+10°)
+            </button>
+            <button class="btn-scenario" data-scenario="turbulence">
+                🌪 2. Updraft / Wind Shear Disturbance (+12 m/s)
+            </button>
+            <button class="btn-scenario" data-scenario="windup_test">
+                ⚠ 3. Actuator Saturation & Anti-Windup Stress Test
+            </button>
+            <button class="btn-scenario" data-scenario="unstable_stabilization">
+                ⚡ 4. Unstable Canard Jet Feedback Stabilization
+            </button>
+            <button class="btn-scenario" data-scenario="sensor_noise">
+                📡 5. Sensor Noise & Derivative Filter (N) Test
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Application Dashboard -->
+    <main class="main-container">
+        
+        <!-- ================= LEFT COLUMN: CONTROL & AIRFRAME CONFIG ================= -->
+        <aside class="panel controls-panel">
+            <div class="panel-header">
+                <span class="panel-title">⚙ Control Deck</span>
+                <span class="badge badge-info">Closed Loop</span>
+            </div>
+            
+            <div class="panel-body">
+                
+                <!-- Airframe Selection -->
+                <div class="control-group">
+                    <div class="control-group-title">1. Aircraft Airframe</div>
+                    <select id="aircraftSelect" class="form-select">
+                        <option value="b747">Boeing 747 Commercial Transport (Cruise)</option>
+                        <option value="f16">F-16 Falcon (Agile Fighter / Relaxed Stability)</option>
+                        <option value="c172">Cessna 172 Skyhawk (Light General Aviation)</option>
+                        <option value="unstable_canard">Experimental Canard Jet (Static Instability)</option>
+                    </select>
+                    
+                    <div id="aircraftInfoText" style="margin-top: 8px; font-size: 0.75rem; line-height: 1.4;">
+                        <!-- Injected dynamically -->
+                    </div>
+                </div>
+
+                <!-- Controller Architecture -->
+                <div class="control-group">
+                    <div class="control-group-title">2. Controller Architecture</div>
+                    <select id="controllerSelect" class="form-select">
+                        <option value="pid_antiwindup">PID with Anti-Windup & Derivative Filter (Recommended)</option>
+                        <option value="pid_standard">Standard PID (Without Anti-Windup)</option>
+                        <option value="pd">PD Controller with Derivative Filter (N)</option>
+                        <option value="p_only">Proportional (P) Controller Only</option>
+                        <option value="lead_lag">Lead-Lag Frequency Domain Compensator</option>
+                        <option value="cascade">Cascade Autopilot (Inner Rate Damper + Outer Attitude Hold)</option>
+                        <option value="lqr">LQR (Linear Quadratic Regulator) Optimal State Feedback</option>
+                        <option value="open_loop">Open-Loop (Manual Uncontrolled Aircraft)</option>
+                    </select>
+                </div>
+
+                <!-- Pitch Attitude Reference Target Command -->
+                <div class="control-group">
+                    <div class="control-group-title">3. Guidance Pitch Command (&theta;<sub>ref</sub>)</div>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Target Pitch Angle (&theta;<sub>cmd</sub>):</span>
+                            <span class="slider-value" id="valPitchCmd">8.00°</span>
+                        </div>
+                        <input type="range" id="sliderPitchCmd" class="slider-input" min="-15" max="20" step="0.5" value="8">
+                    </div>
+                    <div class="quick-steps">
+                        <button class="btn-quick-step" data-step="0">0° Level</button>
+                        <button class="btn-quick-step" data-step="5">+5°</button>
+                        <button class="btn-quick-step" data-step="10">+10°</button>
+                        <button class="btn-quick-step" data-step="15">+15°</button>
+                    </div>
+                </div>
+
+                <!-- Interactive PID & Tuning Sliders -->
+                <div class="control-group" id="pidControlsGroup">
+                    <div class="control-group-title">4. Controller Parameters</div>
+                    
+                    <!-- Proportional Gain Kp -->
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Proportional Gain (K<sub>p</sub>):</span>
+                            <span class="slider-value" id="valKp">2.40</span>
+                        </div>
+                        <input type="range" id="sliderKp" class="slider-input" min="0.1" max="15.0" step="0.1" value="2.4">
+                    </div>
+
+                    <!-- Integral Gain Ki -->
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Integral Gain (K<sub>i</sub>):</span>
+                            <span class="slider-value" id="valKi">0.85</span>
+                        </div>
+                        <input type="range" id="sliderKi" class="slider-input" min="0.0" max="6.0" step="0.05" value="0.85">
+                    </div>
+
+                    <!-- Derivative Gain Kd -->
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Derivative Gain (K<sub>d</sub>):</span>
+                            <span class="slider-value" id="valKd">1.10</span>
+                        </div>
+                        <input type="range" id="sliderKd" class="slider-input" min="0.0" max="6.0" step="0.05" value="1.1">
+                    </div>
+
+                    <!-- Derivative Filter Coefficient N -->
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Filter Coeff (N) [rad/s]:</span>
+                            <span class="slider-value" id="valN">15.00</span>
+                        </div>
+                        <input type="range" id="sliderN" class="slider-input" min="2.0" max="50.0" step="1.0" value="15">
+                    </div>
+                </div>
+
+                <!-- Manual Elevator Control (Visible only in Open Loop) -->
+                <div class="control-group" id="manualControlsGroup" style="display: none;">
+                    <div class="control-group-title">Manual Elevator Deflection</div>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Elevator &delta;<sub>e</sub>:</span>
+                            <span class="slider-value" id="valManualElev">0.00°</span>
+                        </div>
+                        <input type="range" id="sliderManualElev" class="slider-input" min="-25" max="25" step="0.5" value="0">
+                    </div>
+                </div>
+
+                <!-- Disturbances & Nonlinear Constraints -->
+                <div class="control-group">
+                    <div class="control-group-title">5. Environmental & Sensor Realism</div>
+                    
+                    <!-- Wind Updraft Gust -->
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Vertical Wind Gust (Updraft):</span>
+                            <span class="slider-value" id="valWind">0.00 m/s</span>
+                        </div>
+                        <input type="range" id="sliderWind" class="slider-input" min="-20" max="20" step="1" value="0">
+                    </div>
+
+                    <!-- Anti-Windup Clamping Toggle -->
+                    <div class="toggle-row" id="antiWindupOptionRow">
+                        <span class="toggle-label">Anti-Windup Back-Calculation</span>
+                        <label class="switch">
+                            <input type="checkbox" id="checkAntiWindup" checked>
+                            <span class="slider-round"></span>
+                        </label>
+                    </div>
+
+                    <!-- Sensor Gyro Noise Toggle -->
+                    <div class="toggle-row">
+                        <span class="toggle-label">Pitch Gyro Sensor Noise (Gaussian)</span>
+                        <label class="switch">
+                            <input type="checkbox" id="checkSensorNoise">
+                            <span class="slider-round"></span>
+                        </label>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- ================= CENTER COLUMN: 3D & PFD FLIGHT DECK ================= -->
+        <section class="center-column">
+            
+            <!-- Three.js 3D Aircraft Flight Visualizer -->
+            <div class="panel visual-3d-panel">
+                <div class="panel-header">
+                    <span class="panel-title">🌐 3D Aircraft Visualizer</span>
+                    <span class="badge badge-info" id="badgeCamera">Interactive Camera</span>
+                </div>
+                
+                <div id="aircraft3dContainer"></div>
+                
+                <!-- Camera view modes -->
+                <div class="cam-controls">
+                    <button class="btn-cam active" data-cam="chase">Chase View</button>
+                    <button class="btn-cam" data-cam="side">Side Orthogonal</button>
+                    <button class="btn-cam" data-cam="cockpit">Pilot Cockpit</button>
+                </div>
+            </div>
+
+            <!-- Primary Flight Display (PFD) Glass Cockpit -->
+            <div class="panel pfd-panel">
+                <div class="panel-header">
+                    <span class="panel-title">🎛 Primary Flight Display (PFD)</span>
+                    <span class="badge badge-info">Glass Cockpit</span>
+                </div>
+                <canvas id="pfdCanvas"></canvas>
+            </div>
+
+        </section>
+
+        <!-- ================= RIGHT COLUMN: CONTROL ENGINEERING ANALYSIS ================= -->
+        <section class="panel analytics-panel">
+            
+            <!-- Tab Navigation Header -->
+            <div class="tab-nav">
+                <button class="tab-btn active" data-tab="tabScopes">📈 Time Scopes</button>
+                <button class="tab-btn" data-tab="tabBode">📊 Bode Plot</button>
+                <button class="tab-btn" data-tab="tabSPlane">🎯 S-Plane Poles</button>
+                <button class="tab-btn" data-tab="tabRouth">📐 Routh-Hurwitz</button>
+            </div>
+
+            <div class="tab-content">
+                
+                <!-- TAB 1: Real-time Multi-Channel Scopes -->
+                <div class="tab-pane active" id="tabScopes">
+                    <div class="scope-box">
+                        <div class="scope-title">Pitch Attitude Response &theta;(t) vs Commanded Step &theta;<sub>ref</sub>(t)</div>
+                        <canvas id="pitchScopeCanvas" class="scope-canvas"></canvas>
+                    </div>
+
+                    <div class="scope-box">
+                        <div class="scope-title">Elevator Control Effort &delta;<sub>e</sub>(t) [Actuator Saturation: &plusmn;25&deg;]</div>
+                        <canvas id="elevatorScopeCanvas" class="scope-canvas"></canvas>
+                    </div>
+
+                    <!-- Live Transient Metrics HUD -->
+                    <div class="metrics-hud">
+                        <div class="metric-cell">
+                            <span class="metric-cell-title">Rise Time (t<sub>r</sub>)</span>
+                            <span class="metric-cell-val" id="metricTr">—</span>
+                        </div>
+                        <div class="metric-cell">
+                            <span class="metric-cell-title">Peak Time (t<sub>p</sub>)</span>
+                            <span class="metric-cell-val" id="metricTp">—</span>
+                        </div>
+                        <div class="metric-cell">
+                            <span class="metric-cell-title">Overshoot (%OS)</span>
+                            <span class="metric-cell-val" id="metricMp">—</span>
+                        </div>
+                        <div class="metric-cell">
+                            <span class="metric-cell-title">Settling (t<sub>s</sub> 2%)</span>
+                            <span class="metric-cell-val" id="metricTs">—</span>
+                        </div>
+                        <div class="metric-cell">
+                            <span class="metric-cell-title">Error (e<sub>ss</sub>)</span>
+                            <span class="metric-cell-val" id="metricEss">—</span>
+                        </div>
+                        <div class="metric-cell">
+                            <span class="metric-cell-title">Phase Margin (PM)</span>
+                            <span class="metric-cell-val" id="metricPm">—</span>
+                        </div>
+                        <div class="metric-cell">
+                            <span class="metric-cell-title">Gain Margin (GM)</span>
+                            <span class="metric-cell-val" id="metricGm">—</span>
+                        </div>
+                        <div class="metric-cell">
+                            <span class="metric-cell-title">Actuator Status</span>
+                            <span class="metric-cell-val" id="metricActuator" style="color: #4ade80;">NORMAL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: Frequency Response (Bode Plot) -->
+                <div class="tab-pane" id="tabBode">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px;">
+                        Open-Loop Frequency Response <code>L(j&omega;) = C(j&omega;) &middot; G(j&omega;)</code> with Phase &amp; Gain Margins:
+                    </div>
+                    <canvas id="bodeCanvas" style="width: 100%; height: 380px;"></canvas>
+                </div>
+
+                <!-- TAB 3: Complex S-Plane Pole-Zero Map & Root Locus -->
+                <div class="tab-pane" id="tabSPlane">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px;">
+                        Complex Plane (s = &sigma; &plusmn; j&omega;) showing Open-Loop Poles (&times;), Zeros (&cir;), and Closed-Loop Poles (&blacksquare;):
+                    </div>
+                    <canvas id="sPlaneCanvas" style="width: 100%; height: 380px;"></canvas>
+                </div>
+
+                <!-- TAB 4: Automated Routh-Hurwitz Stability Criterion Table -->
+                <div class="tab-pane" id="tabRouth">
+                    <div id="routhContainer">
+                        <!-- Dynamically filled with full Routh Table -->
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Beginner Explanation Modal Dialog -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal-card">
+            <button class="modal-close" id="btnCloseHelp">&times;</button>
+            <h2 style="color: #38bdf8; margin-bottom: 8px;">✈️ What is this Project? (Explain Like I'm 5)</h2>
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px;">
+                You are looking at an <strong>Autopilot Simulation</strong> for an airplane, designed specifically for your <strong>Control Systems</strong> course!
+            </p>
+
+            <div class="tour-step">
+                <h4>🎯 1. What is the real-world story here?</h4>
+                <p>
+                    Imagine you are sitting in an airplane cockpit. The pilot says: <em>"Autopilot, pitch the nose UP by 10 degrees so we can climb!"</em><br>
+                    How does the airplane actually do that without wobbling, stalling, or crashing? It uses a <strong>Control System (Autopilot)</strong>! It measures where the plane is right now, calculates the error, and automatically moves the tail flap (elevator) up or down.
+                </p>
+            </div>
+
+            <div class="tour-step">
+                <h4>🖥️ 2. What are the 3 parts on your screen?</h4>
+                <p>
+                    <strong>LEFT COLUMN ("The Remote Control"):</strong> You are the pilot! You pick the target pitch angle (e.g. +10°), and choose the brain of the autopilot (PID controller, Kp, Ki, Kd sliders).<br><br>
+                    <strong>CENTER COLUMN ("The Cockpit"):</strong> 
+                    - Top: A 3D airplane. Look at the back tail—the amber elevator flap physically moves up/down in real time!<br>
+                    - Bottom: The Primary Flight Display (Artificial Horizon). Blue is the sky, brown is the ground.<br><br>
+                    <strong>RIGHT COLUMN ("The Control Systems Math"):</strong>
+                    - <strong>Time Scopes:</strong> The pink dashed line is your target (+10°). The bright blue line is the actual airplane. Watch the blue line chase and lock onto the pink line!<br>
+                    - <strong>Bode Plot:</strong> Frequency response showing Gain Margin & Phase Margin.<br>
+                    - <strong>S-Plane:</strong> Complex poles ($\sigma \pm j\omega$). If dots are in the green area (Left-Half Plane), the plane is stable! If they touch red, it crashes.<br>
+                    - <strong>Routh-Hurwitz:</strong> The exact stability table from your textbook calculated automatically.
+                </p>
+            </div>
+
+            <div class="tour-step">
+                <h4>⚡ 3. Try This in 10 Seconds (Watch It Work):</h4>
+                <p>
+                    1. Click the button at the top: <strong>"🛫 1. Pitch Step Climb (+10°)"</strong>.<br>
+                    2. Look at the 3D plane: it tilts up to 10 degrees smoothly!<br>
+                    3. Look at the top right graph: the blue line rises and settles perfectly on 10°.<br>
+                    4. Now click <strong>"🌪 2. Updraft / Wind Shear"</strong>: a violent gust of wind hits the plane, but the autopilot immediately fights it and brings the plane back to safety!
+                </p>
+            </div>
+
+            <div class="tour-step">
+                <h4>🎓 4. What to say to your teacher:</h4>
+                <p>
+                    <em>"Sir, I built an interactive simulation of an Aircraft Autopilot. It models 4th-order longitudinal flight dynamics with Short-Period and Phugoid modes. I designed PID controllers with anti-windup to prevent actuator saturation, analyzed frequency stability with Bode Gain and Phase Margins, verified BIBO stability using Routh-Hurwitz, and showed that active feedback stabilizes an open-loop unstable aircraft!"</em>
+                </p>
+            </div>
+
+            <button class="btn btn-primary" id="btnDismissHelp" style="width: 100%; justify-content: center; padding: 10px; font-size: 0.9rem; margin-top: 10px;">
+                Got it! Let me play with the simulation 🚀
+            </button>
+        </div>
+    </div>
+
+    <!-- Offline and CDN Scripts -->
+    <script src="lib/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;"></script>
+    
+    <script src="lib/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js" onerror="this.onerror=null;"></script>
+
+    <script src="lib/katex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.js" onerror="this.onerror=null;"></script>
+    <script src="lib/auto-render.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/contrib/auto-render.min.js" onerror="this.onerror=null;"></script>
+
+    <!-- Application Core Modules -->
+    <script src="js/flight_dynamics.js"></script>
+    <script src="js/controllers.js"></script>
+    <script src="js/routh_hurwitz.js"></script>
+    <script src="js/pfd_gauges.js"></script>
+    <script src="js/aircraft_3d.js"></script>
+    <script src="js/control_plots.js"></script>
+    <script src="js/app.js"></script>
+
+</body>
+</html>
